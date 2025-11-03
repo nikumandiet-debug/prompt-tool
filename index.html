@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI画像/動画プロンプトメーカー（Grok連携）</title>
+    <title>AI画像プロンプトメーカー（Grok連携）</title>
     <style>
         body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: auto; }
         input, textarea, select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
@@ -17,7 +17,7 @@
     </style>
 </head>
 <body>
-    <h1>AIプロンプトメーカー（Grok連携）</h1>
+    <h1>AI画像プロンプトメーカー（Grok連携）</h1>
     <p>日本語入力OK！ 自動英語変換で生成最適化</p>
     
     <div class="section">
@@ -119,35 +119,6 @@
         </select>
     </div>
     
-    <div class="section">
-        <h3>動画オプション（動画モード時）</h3>
-        <label>モード: </label>
-        <select id="mode">
-            <option value="image">画像</option>
-            <option value="video">動画</option>
-        </select>
-        <label>カメラワーク: </label>
-        <select id="camera">
-            <option value="">ランダム</option>
-            <option value="close-up">close-up (クローズアップ)</option>
-            <option value="wide shot">wide shot (ワイドショット)</option>
-            <option value="tracking shot">tracking shot (トラッキングショット)</option>
-            <option value="aerial view">aerial view (空中ショット)</option>
-            <option value="slow pan">slow pan (スローパン)</option>
-            <option value="quick cut">quick cut (クイックカット)</option>
-        </select>
-        <label>動作: </label>
-        <select id="action">
-            <option value="">ランダム</option>
-            <option value="standing">standing (立っている)</option>
-            <option value="walking">walking (歩いている)</option>
-            <option value="jumping">jumping (ジャンプ)</option>
-            <option value="smiling">smiling (微笑む)</option>
-            <option value="dancing">dancing (ダンス)</option>
-            <option value="fighting">fighting (戦う)</option>
-        </select>
-    </div>
-    
     <label class="checkbox">
         <input type="checkbox" id="openGrok" checked> Grokページを開く（OFFで出力&コピーだけ）
     </label>
@@ -157,7 +128,7 @@
     <button class="grok-link" id="openGrokBtn">Grokページだけ開く</button>
 
     <script>
-        function generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action) {
+        function generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution) {
             try {
                 const translations = {
                     '猫娘': 'detailed cat girl with ears and tail',
@@ -194,7 +165,7 @@
                 background = translateInput(background, translations);
                 seasonal = translateInput(seasonal, translations);
 
-                let basePrompt = "Create a {style} image of a highly detailed {subject} as the main focus";
+                let basePrompt = "Create a {style} image of a highly detailed {subject} as the main focus of the scene";
                 if (mood) basePrompt += " in a {mood} mood";
                 basePrompt += ". ";
 
@@ -207,7 +178,7 @@
                 if (clothing) charDetails.push(`wearing ${clothing}`);
                 if (pose) charDetails.push(`in a ${pose} pose`);
                 if (charDetails.length > 0) {
-                    basePrompt += ' featuring ' + charDetails.join(', ') + '. ';
+                    basePrompt += f" featuring {charDetails.join(', ')}. ";
                 }
 
                 let addDetails = [];
@@ -221,13 +192,13 @@
                 if (resolution === '4k') addDetails.push('in 4K resolution');
                 if (resolution === 'hd') addDetails.push('in HD');
                 if (addDetails.length > 0) {
-                    basePrompt += ' ' + addDetails.join(', ') + '. ';
+                    basePrompt += f" {addDetails.join(', ')}. ";
                 }
 
                 basePrompt += "Use vibrant colors, sharp focus, and professional composition.";
 
                 const styles = ['realistic', 'anime', 'cartoon'];
-                const moods = ['warm', 'cool', 'mysterious'];
+                const moods = ['warm', 'cool', 'mystery'];
                 let finalStyle = style || styles[Math.floor(Math.random() * styles.length)];
                 let finalMood = mood || moods[Math.floor(Math.random() * moods.length)];
 
@@ -235,18 +206,6 @@
                     .replace('{style}', finalStyle)
                     .replace('{subject}', subject)
                     .replace('{mood}', finalMood);
-
-                // 動画モード
-                if (mode === 'video') {
-                    let videoDetails = [];
-                    if (camera) videoDetails.push(`${camera} camera work`);
-                    if (action) videoDetails.push(`${action} action`);
-                    if (videoDetails.length > 0) {
-                        prompt = "Create a short video of " + prompt + " with " + videoDetails.join(' and ') + ". Smooth animation, high quality 4K.";
-                    } else {
-                        prompt = "Create a short video of " + prompt + ". Smooth animation, high quality 4K.";
-                    }
-                }
 
                 // 残り日本語除去
                 prompt = prompt.replace(/[\u3040-\u309F\u3400-\u4DBF\u4E00-\u9FFF]/g, '');
@@ -292,17 +251,14 @@
             const lighting = document.getElementById('lighting').value;
             const detail = document.getElementById('detail').value;
             const resolution = document.getElementById('resolution').value;
-            const mode = document.getElementById('mode').value;
-            const camera = document.getElementById('camera').value;
-            const action = document.getElementById('action').value;
-            const openGrok = document.getElementById('openGrok').checked;
+            const openGrok = document.getElementById('openGrok').value;
 
             if (!subject) {
                 alert('主題を入れて！');
                 return;
             }
 
-            const prompt = generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action);
+            const prompt = generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution);
             document.getElementById('output').value = prompt;
             copyToClipboard(prompt);
             if (openGrok) {
