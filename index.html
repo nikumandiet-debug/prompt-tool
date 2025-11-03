@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI画像プロンプトメーカー（ログ画面出力版）</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: auto; }
+        input, textarea, select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        button { background: #007bff; color: white; padding: 10px; border: none; width: 100%; cursor: pointer; margin: 5px 0; }
+        button:hover { background: #0056b3; }
+        #output { border: 1px solid #ccc; min-height: 100px; }
+        #log { border: 1px solid #ff6b6b; min-height: 80px; background: #ffe6e6; padding: 10px; margin: 10px 0; font-size: 12px; color: #333; }
+        .grok-link { background: #28a745; }
+        .section { margin: 10px 0; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+        label { font-size: 12px; color: #666; display: block; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <h1>AI画像プロンプトメーカー（Grok連携）</h1>
+    <p>日本語入力OK！ 自動英語変換で生成最適化</p>
+    
+    <div class="section">
+        <h3>基本（必須）</h3>
+        <label>主題: </label>
+        <input type="text" id="subject" placeholder="例: 猫娘 かわいい" />
+        <label>スタイル: </label>
+        <select id="style">
+            <option value="">ランダム</option>
+            <option value="realistic">realistic (リアル)</option>
+            <option value="anime">anime (アニメ)</option>
+            <option value="cartoon">cartoon (カートゥーン)</option>
+            <option value="fantasy">fantasy (ファンタジー)</option>
+        </select>
+        <label>ムード: </label>
+        <select id="mood">
+            <option value="">ランダム</option>
+            <option value="warm">warm (温かみ)</option>
+            <option value="cool">cool (クール)</option>
+            <option value="mysterious">mysterious (神秘的)</option>
+        </select>
+    </div>
+    
+    <div class="section">
+        <h3>キャラ詳細（オプション）</h3>
+        <label>年齢: </label>
+        <select id="age">
+            <option value="">指定なし</option>
+            <option value="young">young (若い)</option>
+            <option value="adult">adult (大人)</option>
+            <option value="elderly">elderly (老人)</option>
+        </select>
+        <label>肌の色: </label>
+        <select id="skin">
+            <option value="">指定なし</option>
+            <option value="fair">fair (色白)</option>
+            <option value="tan">tan (小麦)</option>
+            <option value="dark">dark (暗め)</option>
+        </select>
+        <label>髪色: </label>
+        <input type="text" id="hair" placeholder="例: 青い髪" />
+        <label>髪型: </label>
+        <select id="hairstyle">
+            <option value="">指定なし</option>
+            <option value="long straight">long straight (ロングストレート)</option>
+            <option value="curly">curly (カーリー)</option>
+            <option value="short bob">short bob (ショートボブ)</option>
+            <option value="ponytail">ponytail (ポニーテール)</option>
+            <option value="braids">braids (三つ編み)</option>
+            <option value="wavy">wavy (ウェーブ)</option>
+            <option value="messy">messy (無造作)</option>
+        </select>
+        <label>目の色: </label>
+        <input type="text" id="eyes" placeholder="例: 緑の目" />
+        <label>服装: </label>
+        <input type="text" id="clothing" placeholder="例: ドレス" />
+        <label>ポーズ: </label>
+        <select id="pose">
+            <option value="">指定なし</option>
+            <option value="standing">standing (立っている)</option>
+            <option value="sitting">sitting (座っている)</option>
+            <option value="dynamic">dynamic (ダイナミック)</option>
+        </select>
+    </div>
+    
+    <div class="section">
+        <h3>背景/品質（オプション）</h3>
+        <label>季節の行事: </label>
+        <select id="seasonal">
+            <option value="">指定なし</option>
+            <option value="christmas">Christmas (クリスマス)</option>
+            <option value="halloween">Halloween (ハロウィン)</option>
+            <option value="newyear">New Year (お正月)</option>
+            <option value="cherryblossom">Cherry Blossom (桜)</option>
+            <option value="summerfestival">Summer Festival (夏祭り)</option>
+            <option value="autumnleaves">Autumn Leaves (紅葉)</option>
+            <option value="valentines">Valentine's Day (バレンタイン)</option>
+        </select>
+        <label>背景: </label>
+        <input type="text" id="background" placeholder="例: 森" />
+        <label>照明: </label>
+        <select id="lighting">
+            <option value="">指定なし</option>
+            <option value="soft">soft (柔らか)</option>
+            <option value="dramatic">dramatic (劇的)</option>
+            <option value="natural">natural (自然)</option>
+        </select>
+        <label>詳細度: </label>
+        <select id="detail">
+            <option value="">標準</option>
+            <option value="high">high (高詳細)</option>
+            <option value="low">low (低詳細)</option>
+        </select>
+        <label>解像度: </label>
+        <select id="resolution">
+            <option value="">標準</option>
+            <option value="4k">4K (高解像)</option>
+            <option value="hd">HD (標準)</option>
+        </select>
+    </div>
+    
+    <button id="generateBtn">Grokに送る（生成+開く）</button>
+    <textarea id="output" placeholder="ここに最適プロンプトが出力..."></textarea>
+    <div id="log">デバッグログ: ページロード完了。ボタン押してログ確認！</div>
+    <button class="grok-link" id="openGrokBtn">Grokページだけ開く</button>
+
+    <script>
+        function addLog(message) {
+            const logEl = document.getElementById('log');
+            if (logEl) {
+                logEl.innerHTML += '<br>' + new Date().toLocaleTimeString() + ': ' + message;
+                logEl.scrollTop = logEl.scrollHeight; // 自動スクロール
+            }
+        }
+
+        addLog('JSロード完了！ iOS互換テスト');
+
+        function generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution) {
+            addLog('generatePrompt呼び出し開始');
+            try {
+                const translations = {
+                    '猫娘': 'cat girl with ears and tail',
+                    '犬': 'dog', 'うさぎ': 'rabbit', 'エルフ': 'elf with pointed ears',
+                    'かわいい': 'cute and whimsical', '怖い': 'scary and eerie', '美しい': 'beautiful and elegant', '楽しい': 'fun and lively', '静かな': 'peaceful and serene',
+                    '青い髪': 'blue hair', '赤い髪': 'red hair', '黒髪': 'black hair', '金髪': 'blonde hair',
+                    '緑の目': 'green eyes', '青い目': 'blue eyes', '赤い目': 'red eyes',
+                    'ドレス': 'flowing dress', 'スーツ': 'sharp suit', '鎧': 'intricate armor',
+                    '森': 'enchanted forest', '海': 'serene ocean', '街': 'bustling city', '未来': 'futuristic cityscape', 'ファンタジー': 'fantasy realm', '冒険': 'adventurous landscape',
+                    'クリスマス': 'Christmas', 'ハロウィン': 'Halloween', 'お正月': 'New Year', '桜': 'Cherry Blossom', '夏祭り': 'Summer Festival', '紅葉': 'Autumn Leaves', 'バレンタイン': "Valentine's Day",
+                    'ロングストレート': 'long straight', 'カーリー': 'curly', 'ショートボブ': 'short bob', 'ポニーテール': 'ponytail', '三つ編み': 'braids', 'ウェーブ': 'wavy', '無造作': 'messy'
+                };
+
+                function translateInput(input, translations) {
+                    if (!input) return input;
+                    let translated = input;
+                    for (let key in translations) {
+                        const regex = new RegExp('\\b' + key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+                        translated = translated.replace(regex, translations[key]);
+                    }
+                    return translated;
+                }
+
+                subject = translateInput(subject, translations);
+                hair = translateInput(hair, translations);
+                eyes = translateInput(eyes, translations);
+                clothing = translateInput(clothing, translations);
+                background = translateInput(background, translations);
+                seasonal = translateInput(seasonal, translations);
+
+                addLog('変換後: ' + JSON.stringify({subject, hair, eyes, clothing, background, seasonal}).substring(0, 100) + '...');
+
+                let basePrompt = "Create a {style} image of a {subject}";
+                if (mood) basePrompt += " in a {mood} mood";
+                basePrompt += ". ";
+
+                let charDetails = [];
+                if (age) charDetails.push(age);
+                if (skin) charDetails.push(`${skin} skin`);
+                if (hair) charDetails.push(`${hair} hair`);
+                if (hairstyle) charDetails.push(`${hairstyle} hairstyle`);
+                if (eyes) charDetails.push(`${eyes} eyes`);
+                if (clothing) charDetails.push(`wearing ${clothing}`);
+                if (pose) charDetails.push(`in a ${pose} pose`);
+                let charStr = '';
+                if (charDetails.length > 0) {
+                    if (charDetails.length > 3) {
+                        charStr = ' with detailed features: ' + charDetails.slice(0,3).join(', ') + ' and more. ';
+                    } else {
+                        charStr = ' with ' + charDetails.join(', ') + '. ';
+                    }
+                }
+                basePrompt += charStr;
+
+                let addDetails = [];
+                if (seasonal) {
+                    addDetails.push(`in a ${seasonal} setting`);
+                }
+                if (background && !seasonal) addDetails.push(`in a ${background} background`);
+                if (lighting) addDetails.push(`with ${lighting} lighting`);
+                if (detail === 'high') addDetails.push('high detail');
+                if (detail === 'low') addDetails.push('low detail');
+                if (resolution === '4k') addDetails.push('in 4K resolution');
+                if (resolution === 'hd') addDetails.push('in HD');
+                if (addDetails.length > 0) {
+                    basePrompt += ' ' + addDetails.join(', ') + '. ';
+                }
+
+                basePrompt += "Use vibrant colors, sharp focus, and professional composition.";
+
+                const styles = ['realistic', 'anime', 'cartoon'];
+                const moods = ['warm', 'cool', 'mysterious'];
+                let finalStyle = style || styles[Math.floor(Math.random() * styles.length)];
+                let finalMood = mood || moods[Math.floor(Math.random() * moods.length)];
+
+                let prompt = basePrompt
+                    .replace('{style}', finalStyle)
+                    .replace('{subject}', subject)
+                    .replace('{mood}', finalMood);
+
+                addLog('生成成功: ' + prompt.substring(0, 100) + '...');
+                return prompt;
+            } catch (e) {
+                addLog('generatePromptエラー: ' + e.message);
+                return 'エラーが発生しました。キーワードをシンプルに試してね！';
+            }
+        }
+
+        function copyToClipboard(text) {
+            addLog('コピー開始');
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        alert('コピー完了！ Grokに貼り付けてね。');
+                    }).catch(() => {
+                        fallbackCopy(text);
+                    });
+                } else {
+                    fallbackCopy(text);
+                }
+            } catch (e) {
+                addLog('コピーエラー: ' + e.message);
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('コピーOK！');
+        }
+
+        function openGrokDirectly() {
+            addLog('Grok開き');
+            window.open('https://x.com/grok', '_blank');
+        }
+
+        function generateAndOpenGrok() {
+            addLog('生成ボタンクリック検知');
+            try {
+                const subject = document.getElementById('subject').value.trim();
+                const style = document.getElementById('style').value;
+                const mood = document.getElementById('mood').value;
+                const age = document.getElementById('age').value;
+                const skin = document.getElementById('skin').value;
+                const hair = document.getElementById('hair').value;
+                const hairstyle = document.getElementById('hairstyle').value;
+                const eyes = document.getElementById('eyes').value;
+                const clothing = document.getElementById('clothing').value;
+                const pose = document.getElementById('pose').value;
+                const seasonal = document.getElementById('seasonal').value;
+                const background = document.getElementById('background').value;
+                const lighting = document.getElementById('lighting').value;
+                const detail = document.getElementById('detail').value;
+                const resolution = document.getElementById('resolution').value;
+
+                addLog('入力値取得完了');
+
+                if (!subject) {
+                    alert('主題を入れて！');
+                    return;
+                }
+
+                const prompt = generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution);
+                const outputEl = document.getElementById('output');
+                if (outputEl) {
+                    outputEl.value = prompt;
+                    addLog('出力設定完了');
+                } else {
+                    addLog('output要素なしエラー');
+                }
+                copyToClipboard(prompt);
+                openGrokDirectly();
+            } catch (e) {
+                addLog('全体エラー: ' + e.message);
+                alert('エラーが発生しました。ログエリアを確認してね！');
+            }
+        }
+
+        // iOS互換イベント追加
+        document.addEventListener('DOMContentLoaded', function() {
+            addLog('DOMロード完了');
+            const generateBtn = document.getElementById('generateBtn');
+            const openGrokBtn = document.getElementById('openGrokBtn');
+            if (generateBtn) {
+                generateBtn.addEventListener('click', generateAndOpenGrok);
+                addLog('生成ボタンイベント追加');
+            }
+            if (openGrokBtn) {
+                openGrokBtn.addEventListener('click', openGrokDirectly);
+                addLog('Grokボタンイベント追加');
+            }
+            // Enterキー対応フォールバック
+            document.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && e.target.id === 'subject') {
+                    generateAndOpenGrok();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
