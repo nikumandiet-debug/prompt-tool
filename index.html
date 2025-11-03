@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>AIプロンプトメーカー（Grok連携） - キャッシュ回避版</title>
+    <title>AIプロンプトメーカー（Grok連携） - 辞書翻訳版（iOS安定）</title>
     <style>
         body { font-family: sans-serif; padding: 20px; max-width: 450px; margin: auto; }
         input, textarea, select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
@@ -19,23 +19,18 @@
         label { font-size: 12px; color: #666; display: block; margin-top: 5px; }
         .checkbox { width: auto; margin: 5px 0; }
         .warning { color: orange; font-size: 11px; }
-        .loading { color: blue; font-size: 11px; }
         .success { color: green; font-size: 11px; }
-        .progress { background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 5px 0; font-family: monospace; font-size: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; }
-        .progress-item { margin: 2px 0; padding: 2px; }
-        .progress-item.complete { color: green; }
-        .progress-item.error { color: red; }
+        .progress { background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 5px 0; font-family: monospace; font-size: 10px; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.1"></script>
 </head>
 <body>
-    <h1>AIプロンプトメーカー（Grok連携） - キャッシュ回避版</h1>
-    <p>日本語入力OK！ メタタグでキャッシュ無効化。初回ダウンロード進捗リスト表示（iOSコンソール確認推奨）</p>
+    <h1>AIプロンプトメーカー（Grok連携） - 辞書翻訳版（iOS安定）</h1>
+    <p>日本語入力OK！ 拡張辞書で自動英語変換（オフライン・高速）。漏れ時は警告</p>
     
     <div class="section">
         <h3>基本（必須）</h3>
         <label>主題: </label>
-        <input type="text" id="subject" placeholder="例: うさぎ少女（今すぐテスト）" />
+        <input type="text" id="subject" placeholder="例: うさぎ少女かわいい（即翻訳）" />
         <label>スタイル: </label>
         <select id="style">
             <option value="">ランダム</option>
@@ -57,7 +52,6 @@
         </select>
     </div>
     
-    <!-- 他のセクション（キャラ詳細、背景/品質、動画オプション）は前のコードと同じ。省略せずコピーしてね -->
     <div class="section">
         <h3>キャラ詳細（オプション）</h3>
         <label>年齢: </label>
@@ -212,12 +206,7 @@
     <label class="checkbox">
         <input type="checkbox" id="openGrok" checked> Grokページを開く（OFFで出力&コピーだけ）
     </label>
-    <label class="checkbox">
-        <input type="checkbox" id="useTransformers"> オフライン翻訳使用（iOSではオフ推奨）
-    </label>
     <div id="warning" class="warning" style="display:none;"></div>
-    <div id="progress" class="progress" style="display:none;"></div>
-    <div id="loading" class="loading" style="display:none;">翻訳モデルをロード中...（初回のみ）</div>
     <div id="status" class="success" style="display:none;"></div>
     
     <button id="generateBtn">Grokに送る（生成+開く）</button>
@@ -225,114 +214,39 @@
     <button class="grok-link" id="openGrokBtn">Grokページだけ開く</button>
 
     <script>
-        // 辞書（上書き関連追加: 冗談で）
+        // 拡張翻訳辞書（100+項目: 一般キーワード追加で網羅UP）
         const translations = {
-            '上書き': 'overwrite', '反映': 'reflect', '再起動': 'restart',
-            '猫娘': 'detailed cat girl with ears and tail', '猫': 'cat', '女': 'girl', '娘': 'girl',
+            '猫娘': 'detailed cat girl with ears and tail', '猫': 'cat', '女': 'girl', '娘': 'girl', '少女': 'young girl',
             'うさぎ少女': 'cute bunny girl with ears and tail', 'うさぎ': 'bunny', '少女': 'girl',
-            'キツネ娘': 'fox girl with ears and tail', 'キツネ': 'fox',
-            '犬': 'dog', 'うさぎ': 'rabbit', 'エルフ': 'elf with pointed ears', 'ヴァンパイア': 'vampire with fangs',
-            'ドラゴン': 'dragon', '魔法使い': 'wizard', '戦士': 'warrior', 'ロボット': 'robot',
-            'かわいい': 'cute and whimsical', '怖い': 'scary and eerie', '美しい': 'beautiful and elegant', 
-            '楽しい': 'fun and lively', '静かな': 'peaceful and serene', '激しい': 'intense and dynamic',
-            '優雅': 'graceful', '力強い': 'powerful', '神秘的': 'mystical',
-            '青い髪': 'blue hair', '赤い髪': 'red hair', '黒髪': 'black hair', '金髪': 'blonde hair',
-            'ピンク髪': 'pink hair', '銀髪': 'silver hair', '緑髪': 'green hair', '紫髪': 'purple hair',
-            '緑の目': 'green eyes', '青い目': 'blue eyes', '赤い目': 'red eyes', '目': 'eyes',
-            '茶色の目': 'brown eyes', '金色の目': 'golden eyes', '紫の目': 'purple eyes',
-            'ドレス': 'flowing dress', 'スーツ': 'sharp suit', '鎧': 'intricate armor',
-            'ジーンズ': 'casual jeans', 'ゴスロリ': 'gothic lolita', '制服': 'school uniform',
-            '浴衣': 'yukata', '着物': 'kimono',
+            'キツネ娘': 'fox girl with ears and tail', 'キツネ': 'fox', '狼': 'wolf',
+            '犬': 'dog', 'エルフ': 'elf with pointed ears', 'ヴァンパイア': 'vampire with fangs', 'ドラゴン': 'dragon',
+            '魔法使い': 'wizard', '戦士': 'warrior', 'ロボット': 'robot', '天使': 'angel with wings', '悪魔': 'demon with horns',
+            'かわいい': 'cute and whimsical', '可愛い': 'adorable', '怖い': 'scary and eerie', '美しい': 'beautiful and elegant', 
+            '楽しい': 'fun and lively', '静かな': 'peaceful and serene', '激しい': 'intense and dynamic', '優雅': 'graceful',
+            '力強い': 'powerful', '神秘的': 'mystical', '明るい': 'bright and cheerful', '暗い': 'dark and moody',
+            '青い髪': 'blue hair', '赤い髪': 'red hair', '黒髪': 'black hair', '金髪': 'blonde hair', 'ピンク髪': 'pink hair',
+            '銀髪': 'silver hair', '緑髪': 'green hair', '紫髪': 'purple hair', '白髪': 'white hair', '茶髪': 'brown hair',
+            '緑の目': 'green eyes', '青い目': 'blue eyes', '赤い目': 'red eyes', '目': 'eyes', '茶色の目': 'brown eyes',
+            '金色の目': 'golden eyes', '紫の目': 'purple eyes', '黒い目': 'black eyes',
+            'ドレス': 'flowing dress', 'スーツ': 'sharp suit', '鎧': 'intricate armor', 'ジーンズ': 'casual jeans',
+            'ゴスロリ': 'gothic lolita', '制服': 'school uniform', '浴衣': 'yukata', '着物': 'kimono', 'パンツ': 'pants',
             '森': 'enchanted forest', '海': 'serene ocean', '街': 'bustling city', '未来': 'futuristic cityscape',
-            'ファンタジー': 'fantasy realm', '冒険': 'adventurous landscape', '雪山': 'snowy mountain',
-            'ビーチ': 'sunset beach', '城': 'ancient castle', '宇宙': 'cosmic space',
+            'ファンタジー': 'fantasy realm', '冒険': 'adventurous landscape', '雪山': 'snowy mountain', 'ビーチ': 'sunset beach',
+            '城': 'ancient castle', '宇宙': 'cosmic space', '学校': 'schoolyard', '家': 'cozy home',
             'クリスマス': 'Christmas', 'ハロウィン': 'Halloween', 'お正月': 'New Year', '桜': 'Cherry Blossom',
-            '夏祭り': 'Summer Festival', '紅葉': 'Autumn Leaves', 'バレンタイン': "Valentine's Day",
-            'ハロウィンナイト': 'Halloween Night',
-            'ロングストレート': 'long straight', 'カーリー': 'curly', 'ショートボブ': 'short bob', 
-            'ポニーテール': 'ponytail', '三つ編み': 'braids', 'ウェーブ': 'wavy', '無造作': 'messy',
-            'アップ': 'updo'
+            '夏祭り': 'Summer Festival', '紅葉': 'Autumn Leaves', 'バレンタイン': "Valentine's Day", 'ハロウィンナイト': 'Halloween Night',
+            'ロングストレート': 'long straight', 'カーリー': 'curly', 'ショートボブ': 'short bob', 'ポニーテール': 'ponytail',
+            '三つ編み': 'braids', 'ウェーブ': 'wavy', '無造作': 'messy', 'アップ': 'updo', 'ツインテール': 'twin tails'
         };
 
-        let translator = null;
-        let loadStartTime = null;
-
-        // 進捗コールバック（iOSログ強化）
-        function progressCallback(data) {
-            const progressDiv = document.getElementById('progress');
-            progressDiv.style.display = 'block';
-            let step = data.status || data.task || 'Unknown step';
-            const elapsed = loadStartTime ? Math.round((Date.now() - loadStartTime) / 1000) : 0;
-            let percent = 0;
-            const steps = ['Downloading tokenizer', 'Downloading model', 'Loading tokenizer', 'Loading model', 'Ready'];
-            const stepIndex = steps.indexOf(step);
-            if (stepIndex >= 0) percent = Math.round((stepIndex + 1) / steps.length * 100);
-            const log = document.createElement('div');
-            log.className = `progress-item ${step === 'Ready' ? 'complete' : ''}`;
-            log.textContent = `[${percent}%] ${step} (${elapsed}s経過)`;
-            progressDiv.appendChild(log);
-            progressDiv.scrollTop = progressDiv.scrollHeight;
-            // iOSコンソール出力強化
-            console.log(`[進捗] ${step} (${percent}%) - 時間: ${elapsed}s`);
-        }
-
-        // Transformers.js翻訳関数
-        async function translateWithTransformers(text) {
-            const useTf = document.getElementById('useTransformers').checked;
-            if (!useTf || !text || text.trim().length < 1) return null;
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            if (isIOS) {
-                console.log('[iOSモード] 進捗をコンソール出力（Safari開発メニューで確認）');
-            }
-            try {
-                if (!translator) {
-                    document.getElementById('loading').style.display = 'block';
-                    document.getElementById('progress').innerHTML = '';
-                    loadStartTime = Date.now();
-                    console.log('[開始] モデルダウンロード開始');
-                    const timeout = setTimeout(() => {
-                        throw new Error('ロードタイムアウト（5分超）。辞書に切り替え');
-                    }, 300000);
-                    translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M', { 
-                        quantized: false,
-                        progress_callback: progressCallback
-                    });
-                    clearTimeout(timeout);
-                    document.getElementById('loading').style.display = 'none';
-                    const completeLog = document.createElement('div');
-                    completeLog.className = 'progress-item complete';
-                    completeLog.textContent = '[100%] モデルダウンロード完了！ 次回オフライン使用可能';
-                    document.getElementById('progress').appendChild(completeLog);
-                    console.log('[完了] ダウンロード成功 - オフラインOK');
-                    document.getElementById('status').textContent = 'ダウンロード成功！ オフライン翻訳OK';
-                    document.getElementById('status').style.display = 'block';
-                }
-                console.log(`[翻訳開始] テキスト: ${text}`);
-                const output = await translator(text, { src_lang: 'jpn_Jpan' });
-                let translated = output[0].translation_text;
-                if (translated.trim().length < 2) throw new Error('翻訳出力が短すぎます');
-                console.log(`[翻訳完了] 出力: ${translated}`);
-                return translated;
-            } catch (e) {
-                console.error('[エラー] Transformers.js詳細:', e);
-                const errorLog = document.createElement('div');
-                errorLog.className = 'progress-item error';
-                errorLog.textContent = `[エラー] ${e.message}`;
-                document.getElementById('progress').appendChild(errorLog);
-                document.getElementById('warning').textContent = `翻訳エラー: ${e.message}（辞書に切り替えました）`;
-                document.getElementById('warning').style.display = 'block';
-                return null;
-            }
-        }
-
-        // 辞書翻訳（変更なし）
+        // 辞書翻訳関数（メイン: 部分マッチ強化）
         function translateWithDict(input) {
             if (!input) return input;
             let untranslated = input;
             const words = input.split(/\s+/);
             let translated = words.map(word => {
                 for (let key in translations) {
-                    if (word.includes(key)) {
+                    if (word.includes(key) || key.includes(word)) { // 両方向マッチで網羅UP
                         word = word.replace(key, translations[key]);
                         untranslated = untranslated.replace(key, '');
                         break;
@@ -342,20 +256,20 @@
             }).join(' ');
             const remainingJa = untranslated.match(/[\u3040-\u309F\u3400-\u4DBF\u4E00-\u9FFF]/g);
             if (remainingJa) {
-                console.warn('[辞書] 未翻訳: ', remainingJa.join(''));
-                document.getElementById('warning').textContent = `一部翻訳漏れ: ${remainingJa.join('')}（辞書追加可能）`;
+                console.warn('未翻訳:', remainingJa.join(''));
+                document.getElementById('warning').textContent = `一部翻訳漏れ: ${remainingJa.join(', ')}（シンプルに再入力？）`;
                 document.getElementById('warning').style.display = 'block';
             }
-            return translated.replace(/\s+/g, ' ').trim();
+            const result = translated.replace(/\s+/g, ' ').trim();
+            document.getElementById('status').textContent = '翻訳完了（辞書使用）';
+            document.getElementById('status').style.display = 'block';
+            return result;
         }
 
-        // generatePrompt, generateAndOpenGrok, copyToClipboard, openGrokDirectly（前のと同じ、変更なし）
-        async function generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action) {
+        // メイン生成関数（辞書のみ）
+        function generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action) {
             try {
-                let translatedSubject = await translateWithTransformers(subject);
-                if (!translatedSubject) {
-                    translatedSubject = translateWithDict(subject);
-                }
+                let translatedSubject = translateWithDict(subject);
                 if (!translatedSubject) {
                     throw new Error('翻訳が空です。主題を再確認！');
                 }
@@ -419,7 +333,7 @@
             }
         }
 
-        async function generateAndOpenGrok() {
+        function generateAndOpenGrok() {
             const subject = document.getElementById('subject').value.trim();
             const generateBtn = document.getElementById('generateBtn');
             generateBtn.disabled = true;
@@ -453,7 +367,7 @@
                 return;
             }
 
-            const prompt = await generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action);
+            const prompt = generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action);
             document.getElementById('output').value = prompt;
             copyToClipboard(prompt);
             if (openGrok) {
