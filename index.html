@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIプロンプトメーカー（Grok連携） - オフライン翻訳版（進捗表示）</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>AIプロンプトメーカー（Grok連携） - キャッシュ回避版</title>
     <style>
         body { font-family: sans-serif; padding: 20px; max-width: 450px; margin: auto; }
         input, textarea, select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
@@ -18,20 +21,21 @@
         .warning { color: orange; font-size: 11px; }
         .loading { color: blue; font-size: 11px; }
         .success { color: green; font-size: 11px; }
-        .progress { background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 5px 0; font-family: monospace; font-size: 10px; max-height: 150px; overflow-y: auto; }
-        .progress-item { margin: 2px 0; }
+        .progress { background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 5px 0; font-family: monospace; font-size: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; }
+        .progress-item { margin: 2px 0; padding: 2px; }
+        .progress-item.complete { color: green; }
+        .progress-item.error { color: red; }
     </style>
-    <!-- Transformers.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.15.1"></script>
 </head>
 <body>
-    <h1>AIプロンプトメーカー（Grok連携） - オフライン翻訳版（進捗表示）</h1>
-    <p>日本語入力OK！ 初回ダウンロード進捗を表示（完了後オフライン）。エラー時は辞書自動使用</p>
+    <h1>AIプロンプトメーカー（Grok連携） - キャッシュ回避版</h1>
+    <p>日本語入力OK！ メタタグでキャッシュ無効化。初回ダウンロード進捗リスト表示（iOSコンソール確認推奨）</p>
     
     <div class="section">
         <h3>基本（必須）</h3>
         <label>主題: </label>
-        <input type="text" id="subject" placeholder="例: 猫（シンプルテストOK）" />
+        <input type="text" id="subject" placeholder="例: うさぎ少女（今すぐテスト）" />
         <label>スタイル: </label>
         <select id="style">
             <option value="">ランダム</option>
@@ -53,6 +57,7 @@
         </select>
     </div>
     
+    <!-- 他のセクション（キャラ詳細、背景/品質、動画オプション）は前のコードと同じ。省略せずコピーしてね -->
     <div class="section">
         <h3>キャラ詳細（オプション）</h3>
         <label>年齢: </label>
@@ -207,6 +212,9 @@
     <label class="checkbox">
         <input type="checkbox" id="openGrok" checked> Grokページを開く（OFFで出力&コピーだけ）
     </label>
+    <label class="checkbox">
+        <input type="checkbox" id="useTransformers"> オフライン翻訳使用（iOSではオフ推奨）
+    </label>
     <div id="warning" class="warning" style="display:none;"></div>
     <div id="progress" class="progress" style="display:none;"></div>
     <div id="loading" class="loading" style="display:none;">翻訳モデルをロード中...（初回のみ）</div>
@@ -217,9 +225,12 @@
     <button class="grok-link" id="openGrokBtn">Grokページだけ開く</button>
 
     <script>
-        // 旧翻訳辞書（fallback用）
+        // 辞書（上書き関連追加: 冗談で）
         const translations = {
+            '上書き': 'overwrite', '反映': 'reflect', '再起動': 'restart',
             '猫娘': 'detailed cat girl with ears and tail', '猫': 'cat', '女': 'girl', '娘': 'girl',
+            'うさぎ少女': 'cute bunny girl with ears and tail', 'うさぎ': 'bunny', '少女': 'girl',
+            'キツネ娘': 'fox girl with ears and tail', 'キツネ': 'fox',
             '犬': 'dog', 'うさぎ': 'rabbit', 'エルフ': 'elf with pointed ears', 'ヴァンパイア': 'vampire with fangs',
             'ドラゴン': 'dragon', '魔法使い': 'wizard', '戦士': 'warrior', 'ロボット': 'robot',
             'かわいい': 'cute and whimsical', '怖い': 'scary and eerie', '美しい': 'beautiful and elegant', 
@@ -246,59 +257,75 @@
         let translator = null;
         let loadStartTime = null;
 
-        // 進捗コールバック: ステップをログ表示（%推定）
+        // 進捗コールバック（iOSログ強化）
         function progressCallback(data) {
             const progressDiv = document.getElementById('progress');
             progressDiv.style.display = 'block';
-            const step = data.status || data.task;
+            let step = data.status || data.task || 'Unknown step';
             const elapsed = loadStartTime ? Math.round((Date.now() - loadStartTime) / 1000) : 0;
             let percent = 0;
-            // 簡易%推定（ステップ数ベース: 5ステップ想定）
             const steps = ['Downloading tokenizer', 'Downloading model', 'Loading tokenizer', 'Loading model', 'Ready'];
             const stepIndex = steps.indexOf(step);
             if (stepIndex >= 0) percent = Math.round((stepIndex + 1) / steps.length * 100);
             const log = document.createElement('div');
-            log.className = 'progress-item';
+            log.className = `progress-item ${step === 'Ready' ? 'complete' : ''}`;
             log.textContent = `[${percent}%] ${step} (${elapsed}s経過)`;
             progressDiv.appendChild(log);
             progressDiv.scrollTop = progressDiv.scrollHeight;
-            console.log(`進捗: ${step} (${percent}%)`);
+            // iOSコンソール出力強化
+            console.log(`[進捗] ${step} (${percent}%) - 時間: ${elapsed}s`);
         }
 
-        // Transformers.js翻訳関数（進捗コールバック追加）
+        // Transformers.js翻訳関数
         async function translateWithTransformers(text) {
-            if (!text || text.trim().length < 1) return null;
+            const useTf = document.getElementById('useTransformers').checked;
+            if (!useTf || !text || text.trim().length < 1) return null;
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS) {
+                console.log('[iOSモード] 進捗をコンソール出力（Safari開発メニューで確認）');
+            }
             try {
                 if (!translator) {
                     document.getElementById('loading').style.display = 'block';
-                    document.getElementById('progress').innerHTML = ''; // リセット
+                    document.getElementById('progress').innerHTML = '';
                     loadStartTime = Date.now();
+                    console.log('[開始] モデルダウンロード開始');
                     const timeout = setTimeout(() => {
                         throw new Error('ロードタイムアウト（5分超）。辞書に切り替え');
-                    }, 300000); // 5分タイムアウト
+                    }, 300000);
                     translator = await pipeline('translation', 'Xenova/nllb-200-distilled-600M', { 
                         quantized: false,
-                        progress_callback: progressCallback  // 進捗コールバック
+                        progress_callback: progressCallback
                     });
                     clearTimeout(timeout);
                     document.getElementById('loading').style.display = 'none';
-                    document.getElementById('progress').innerHTML += '<div class="progress-item" style="color:green;">ロード完了！</div>';
-                    document.getElementById('status').textContent = 'モデルロード完了！ 次回からオフライン。';
+                    const completeLog = document.createElement('div');
+                    completeLog.className = 'progress-item complete';
+                    completeLog.textContent = '[100%] モデルダウンロード完了！ 次回オフライン使用可能';
+                    document.getElementById('progress').appendChild(completeLog);
+                    console.log('[完了] ダウンロード成功 - オフラインOK');
+                    document.getElementById('status').textContent = 'ダウンロード成功！ オフライン翻訳OK';
                     document.getElementById('status').style.display = 'block';
                 }
+                console.log(`[翻訳開始] テキスト: ${text}`);
                 const output = await translator(text, { src_lang: 'jpn_Jpan' });
                 let translated = output[0].translation_text;
                 if (translated.trim().length < 2) throw new Error('翻訳出力が短すぎます');
+                console.log(`[翻訳完了] 出力: ${translated}`);
                 return translated;
             } catch (e) {
-                console.error('Transformers.jsエラー詳細:', e);
+                console.error('[エラー] Transformers.js詳細:', e);
+                const errorLog = document.createElement('div');
+                errorLog.className = 'progress-item error';
+                errorLog.textContent = `[エラー] ${e.message}`;
+                document.getElementById('progress').appendChild(errorLog);
                 document.getElementById('warning').textContent = `翻訳エラー: ${e.message}（辞書に切り替えました）`;
                 document.getElementById('warning').style.display = 'block';
                 return null;
             }
         }
 
-        // 旧辞書翻訳（fallback）
+        // 辞書翻訳（変更なし）
         function translateWithDict(input) {
             if (!input) return input;
             let untranslated = input;
@@ -315,13 +342,14 @@
             }).join(' ');
             const remainingJa = untranslated.match(/[\u3040-\u309F\u3400-\u4DBF\u4E00-\u9FFF]/g);
             if (remainingJa) {
-                console.warn('未翻訳日本語:', remainingJa.join(''));
-                translated += ` [untranslated: ${remainingJa.join('')}]`;
+                console.warn('[辞書] 未翻訳: ', remainingJa.join(''));
+                document.getElementById('warning').textContent = `一部翻訳漏れ: ${remainingJa.join('')}（辞書追加可能）`;
+                document.getElementById('warning').style.display = 'block';
             }
-            return translated.trim();
+            return translated.replace(/\s+/g, ' ').trim();
         }
 
-        // メイン生成関数（ボタン無効化追加）
+        // generatePrompt, generateAndOpenGrok, copyToClipboard, openGrokDirectly（前のと同じ、変更なし）
         async function generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action) {
             try {
                 let translatedSubject = await translateWithTransformers(subject);
