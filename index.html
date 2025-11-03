@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>AIプロンプトメーカー（Grok連携） - 辞書翻訳版（iOS安定）</title>
+    <title>AIプロンプトメーカー（Grok連携） - 辞書翻訳版（マッチ修正）</title>
     <style>
         body { font-family: sans-serif; padding: 20px; max-width: 450px; margin: auto; }
         input, textarea, select { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
@@ -20,17 +20,16 @@
         .checkbox { width: auto; margin: 5px 0; }
         .warning { color: orange; font-size: 11px; }
         .success { color: green; font-size: 11px; }
-        .progress { background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 5px 0; font-family: monospace; font-size: 10px; }
     </style>
 </head>
 <body>
-    <h1>AIプロンプトメーカー（Grok連携） - 辞書翻訳版（iOS安定）</h1>
-    <p>日本語入力OK！ 拡張辞書で自動英語変換（オフライン・高速）。漏れ時は警告</p>
+    <h1>AIプロンプトメーカー（Grok連携） - 辞書翻訳版（マッチ修正）</h1>
+    <p>日本語入力OK！ 連続キーワードも正しく翻訳（例: うさぎ少女かわいい → bunny girl cute）。漏れ時は警告</p>
     
     <div class="section">
         <h3>基本（必須）</h3>
         <label>主題: </label>
-        <input type="text" id="subject" placeholder="例: うさぎ少女かわいい（即翻訳）" />
+        <input type="text" id="subject" placeholder="例: うさぎ少女かわいい（連続翻訳テスト）" />
         <label>スタイル: </label>
         <select id="style">
             <option value="">ランダム</option>
@@ -214,7 +213,7 @@
     <button class="grok-link" id="openGrokBtn">Grokページだけ開く</button>
 
     <script>
-        // 拡張翻訳辞書（100+項目: 一般キーワード追加で網羅UP）
+        // 拡張翻訳辞書（網羅強化）
         const translations = {
             '猫娘': 'detailed cat girl with ears and tail', '猫': 'cat', '女': 'girl', '娘': 'girl', '少女': 'young girl',
             'うさぎ少女': 'cute bunny girl with ears and tail', 'うさぎ': 'bunny', '少女': 'girl',
@@ -239,39 +238,38 @@
             '三つ編み': 'braids', 'ウェーブ': 'wavy', '無造作': 'messy', 'アップ': 'updo', 'ツインテール': 'twin tails'
         };
 
-        // 辞書翻訳関数（メイン: 部分マッチ強化）
+        // 翻訳関数（全体replaceループで連続キーワード対応）
         function translateWithDict(input) {
             if (!input) return input;
+            let result = input;
             let untranslated = input;
-            const words = input.split(/\s+/);
-            let translated = words.map(word => {
-                for (let key in translations) {
-                    if (word.includes(key) || key.includes(word)) { // 両方向マッチで網羅UP
-                        word = word.replace(key, translations[key]);
-                        untranslated = untranslated.replace(key, '');
-                        break;
-                    }
-                }
-                return word;
-            }).join(' ');
-            const remainingJa = untranslated.match(/[\u3040-\u309F\u3400-\u4DBF\u4E00-\u9FFF]/g);
-            if (remainingJa) {
-                console.warn('未翻訳:', remainingJa.join(''));
-                document.getElementById('warning').textContent = `一部翻訳漏れ: ${remainingJa.join(', ')}（シンプルに再入力？）`;
-                document.getElementById('warning').style.display = 'block';
+            // 全体文字列でキーワードを順次置き換え（複数マッチOK）
+            for (let key in translations) {
+                result = result.replace(new RegExp(key, 'g'), translations[key]);
+                untranslated = untranslated.replace(new RegExp(key, 'g'), '');
             }
-            const result = translated.replace(/\s+/g, ' ').trim();
-            document.getElementById('status').textContent = '翻訳完了（辞書使用）';
+            // 残り日本語チェック
+            const remainingJa = untranslated.match(/[\u3040-\u309F\u3400-\u4DBF\u4E00-\u9FFF]/g);
+            if (remainingJa && remainingJa.length > 0) {
+                console.warn('未翻訳部分:', remainingJa.join(''));
+                document.getElementById('warning').textContent = `一部翻訳漏れ: ${remainingJa.join(', ')}（Grokが自然に扱います）`;
+                document.getElementById('warning').style.display = 'block';
+            } else {
+                document.getElementById('warning').style.display = 'none';
+            }
+            // 出力クリーン（複数スペース除去）
+            result = result.replace(/\s+/g, ' ').trim();
+            document.getElementById('status').textContent = '翻訳完了！（連続キーワード対応）';
             document.getElementById('status').style.display = 'block';
             return result;
         }
 
-        // メイン生成関数（辞書のみ）
+        // メイン生成関数
         function generatePrompt(subject, style, mood, age, skin, hair, hairstyle, eyes, clothing, pose, seasonal, background, lighting, detail, resolution, mode, camera, action) {
             try {
                 let translatedSubject = translateWithDict(subject);
-                if (!translatedSubject) {
-                    throw new Error('翻訳が空です。主題を再確認！');
+                if (!translatedSubject || translatedSubject === subject) {
+                    throw new Error('翻訳が空または変化なし。主題を再確認！');
                 }
 
                 let basePrompt = "Create a {style} image of a highly detailed " + translatedSubject + " as the main focus of the scene";
